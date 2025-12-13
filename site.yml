@@ -1,0 +1,11 @@
+---
+- hosts: webserver
+  remote_user: cloud_test
+  become: yes
+  roles:
+    - web_server
+- hosts: dbserver
+  remote_user: cloud_test
+  become: yes
+  roles:
+    - db_server
