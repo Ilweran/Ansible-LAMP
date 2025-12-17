@@ -1,0 +1,53 @@
+---
+- name: Install DJango and make sure it is of the latest verion
+  apt:
+    name: python3-django
+    state: present
+- name: Create a directory for DJango app
+  file:
+    path: "{{ django_app_location }}/web_app"
+    mode: 0755
+    owner: root
+    group: root
+    state: directory
+- name: Create new DJango app in the web_app directory
+  ansible.builtin.shell: 'django-admin startproject web_app "{{ django_app_location }}/web_app"'
+  args:
+    creates: "{{ django_app_location }}/web_app/manage.py"
+- name: Fix DJANGO_SETTINGS_MODULE in manage.py
+  ansible.builtin.replace:
+    path: "{{ django_app_location }}/web_app/manage.py"
+    regexp: "project.settings"
+    replace: "web_app.settings"
+- name: Configure database to use with DJango
+  copy:
+    src: settings.py
+    dest: "{{ django_app_location }}/web_app/web_app/settings.py"
+- name: Install system dependencies for mysqlclient
+  apt:
+    name:
+      - pkg-config
+      - python3-dev
+      - build-essential
+      - default-libmysqlclient-dev
+    state: present
+- name: Install MySQL client libraries for Django
+  ansible.builtin.pip:
+    name: mysqlclient
+    executable: pip3
+- name: Apply a migration into the mysql database 
+  ansible.builtin.command:
+    argv:
+      - python3
+      - manage.py
+      - migrate
+  args:
+    chdir: "{{ django_app_location }}/web_app"
+- name: Populate admin with password
+  ansible.builtin.command: >
+    - name: Populate admin with password
+  ansible.builtin.command: >
+    python3 manage.py shell -c
+    "from django.contrib.auth.models import User; User.objects.filter(username='admin').exists() or User.objects.create_superuser(  'admin','admin@example.com','changeme')"
+  args:
+    chdir: "{{ django_app_location }}/web_app/"
