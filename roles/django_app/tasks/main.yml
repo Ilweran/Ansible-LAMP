@@ -3,6 +3,10 @@
   apt:
     name: python3-django
     state: present
+- name: Check if DJango app already exists
+  ansible.builtin.shell: "ls -l {{ django_app_location }} | grep -c web_app"
+  register: djangostatus
+  failed_when: djangostatus.rc == 2
 - name: Create a directory for DJango app
   file:
     path: "{{ django_app_location }}/web_app"
@@ -10,19 +14,23 @@
     owner: root
     group: root
     state: directory
+  when: djangostatus.stdout == "0"
 - name: Create new DJango app in the web_app directory
   ansible.builtin.shell: 'django-admin startproject web_app "{{ django_app_location }}/web_app"'
   args:
     creates: "{{ django_app_location }}/web_app/manage.py"
+  when: djangostatus.stdout == "0"
 - name: Fix DJANGO_SETTINGS_MODULE in manage.py
   ansible.builtin.replace:
     path: "{{ django_app_location }}/web_app/manage.py"
     regexp: "project.settings"
     replace: "web_app.settings"
+  when: djangostatus.stdout == "0"
 - name: Configure database to use with DJango
   copy:
     src: settings.py
     dest: "{{ django_app_location }}/web_app/web_app/settings.py"
+  when: djangostatus.stdout == "0"
 - name: Install system dependencies for mysqlclient
   apt:
     name:
@@ -31,10 +39,12 @@
       - build-essential
       - default-libmysqlclient-dev
     state: present
+  when: djangostatus.stdout == "0"
 - name: Install MySQL client libraries for Django
   ansible.builtin.pip:
     name: mysqlclient
     executable: pip3
+  when: djangostatus.stdout == "0"
 - name: Apply a migration into the mysql database 
   ansible.builtin.command:
     argv:
@@ -43,6 +53,7 @@
       - migrate
   args:
     chdir: "{{ django_app_location }}/web_app"
+  when: djangostatus.stdout == "0"
 - name: Populate admin with password
   ansible.builtin.command: >
     - name: Populate admin with password
@@ -51,3 +62,4 @@
     "from django.contrib.auth.models import User; User.objects.filter(username='admin').exists() or User.objects.create_superuser(  'admin','admin@example.com','changeme')"
   args:
     chdir: "{{ django_app_location }}/web_app/"
+  when: djangostatus.stdout == "0"
